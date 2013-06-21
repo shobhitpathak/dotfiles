@@ -1,0 +1,378 @@
+#!/usr/bin/env bash
+#
+# screenFetch
+#
+# Script to fetch system and theme settings for screenshots in most mainstream
+# Linux distributions.
+#
+# This script is released under the General Public License (GPL). Though it's open
+# source and you are free to do with it as you please, I would appreciate if you would
+# send any code modifications/additions upstream to me so that I can include them in
+# the official release. Please do not claim this code as your own as I have worked
+# very hard on this and am quite proud to call this script my own.
+#
+
+scriptVersion="1.0"
+
+######################
+# Settings for fetcher
+######################
+# This sets the information to be displayed.
+# Available: user host, kernel, DE, WM, theme, font, uptime, pkgs, shell, theme, font. 
+display=(user host kernel de wm theme font uptime pkgs shell theme font)
+
+#To get just the information, and not a text-art logo, use TEXT in the below variable.
+display_type="ASCII"
+
+# Colors to use for the information found. If you would like to set your OWN color scheme for these, uncomment the lines below and edit them to your heart's content.
+textcolor="\e[0;37m" # Color of variable variables in TEXT, e.g. the output
+labelcolor="\e[1;34m" # Color of static variables in TEXT, e.g. "User"/"Host"
+c0="\033[0m"   # Reset Text
+c1="\e[1;34m"  # Light color in ASCII
+c2="\e[1;37m"  # Dark color in ASCII
+bold="\033[1m" # Bold Text
+
+# WM & DE process names
+wmnames="fluxbox openbox blackbox xfwm4 mutter metacity kwin icewm pekwm fvwm dwm awesome wmaker stumpwm musca i3 xmonad ratpoison scrotwm spectrwm wmfs wmii beryl subtle e16 enlightenment sawfish emerald monsterwm dminiwm compiz herbstluftwm"
+denames="gnome-session xfce-mcs-manage xfce4-session xfconfd ksmserver lxsession gnome-settings-daemon mate-session mate-settings-daemon Finder"
+
+function errorOut () {
+	echo -e "\033[1;37m[ \033[1;31m! \033[1;37m] \033[0m$1"
+}
+
+#####################
+# Begin Flags Phase
+#####################
+while getopts ":hvn:" flags; do
+	case $flags in
+		h)
+			echo -e "${bold}Usage${c0}: screenFetch [OPTIONAL FLAGS]"
+			echo ""
+			echo "screenFetch - a CLI Bash script to show system/theme info in screenshots."
+			echo ""
+			echo -e "${bold}Supported Desktop Managers${c0}:   KDE, GNOME, XFCE, and LXDE, and Not Present"
+			echo -e "${bold}Supported Window Managers${c0}:    PekWM, OpenBox, FluxBox, BlackBox, Xfwm4,"
+			echo -e "			      Mutter, Metacity, StumpWM, KWin, IceWM, FVWM,"
+			echo -e "			      DWM, Awesome, XMonad, Musca, i3, WindowMaker,"
+			echo -e "			      Ratpoison, wmii, WMFS, ScrotWM, SpectrWM,"
+			echo -e "			      subtle, Emerald, E17 and Beryl."
+			echo ""
+			echo -e "${bold}Options${c0}:"
+			echo -e "   ${bold}-n${c0}                 Do no display ASCII distribution logo."
+			echo -e "   ${bold}-v${c0}                 Display current script version."
+			echo -e "   ${bold}-h${c0}                 Display this help."
+			exit
+		;;
+		v)
+			echo -e "$bold ScreenFetch"$c0" - Version $scriptVersion"
+			echo "Created by and licensed to Brett Bohnenkamper (kittykatt@silverirc.com)"
+			echo ""
+			echo "This is free software; see the source for copying conditions.  There is NO warranty; not even MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+			exit
+		;;
+		n) display_type="TEXT";;
+		:) errorOut "Error: You're missing an argument somewhere. Exiting."; exit 1;;
+		?) errorOut "Error: Invalid flag somewhere. Exiting."; exit 1;;
+		*) errorOut "Error"; exit 1;;
+	esac
+done
+###################
+# End Flags Phase
+###################
+
+#########################
+# Begin Detection Phase
+#########################
+
+# User detection
+detectuser () {
+	user=${USER}
+}
+
+# Host detection
+detecthost () {
+	host=${HOSTNAME}
+}
+
+# Kernel detection
+detectkernel () {
+	kernel=`echo $(uname -mr)`
+}
+
+# Uptime detection - begin
+detectuptime () {
+	uptime=$(</proc/uptime)
+	uptime=${uptime//.*}
+	secs=$((${uptime}%60))
+	mins=$((${uptime}/60%60))
+	hours=$((${uptime}/3600%24))
+	days=$((${uptime}/86400))
+	uptime="${mins}m"
+	if [ "${hours}" -ne "0" ]; then
+		uptime="${hours}h ${uptime}"
+	fi
+	if [ "${days}" -ne "0" ]; then
+		uptime="${days}d ${uptime}"
+	fi
+}
+# Uptime detection - end
+
+# Package count
+detectpkgs () {
+	pkgs=$(pacman -Qq | wc -l)
+}
+
+# Shell detection
+detectshell () {
+		shell=$(ps -p $(ps -p $PPID -o pid --no-heading) -o cmd --no-heading)
+		shell=${shell/-}
+}
+
+# DE detection - begin
+detectde () {
+	DE="Not Present"
+		if [[ -n $( type -p xprop ) ]];then
+			xprop_root="$( xprop -root 2>/dev/null )"
+		fi
+
+		if [[ -n $xprop_root && -n $( grep -is '^_MUFFIN' <<< "$xprop_root" ) ]]; then
+			DE="Cinnamon"
+		elif [[ -n $xprop_root && -n $( grep -is '^_MARCO' <<< "$xprop_root" ) ]];then
+			DE="Mate"
+		elif [[ -n $GNOME_DESKTOP_SESSION_ID ]]; then
+			DE="Gnome"
+		elif [[ $KDE_SESSION_VERSION == '5' ]]; then
+			DE="KDE5"
+		elif [[ $KDE_SESSION_VERSION == '4' ]]; then
+			DE="KDE4"
+		elif [[ $KDE_FULL_SESSION == 'true' ]]; then
+			DE="KDE"
+		elif [[ -n $( grep -Eis '\"xfce4\"' <<< "$xprop_root" ) ]];then
+			DE="XFCE4"
+		elif [[ -n $( grep -is '\"xfce5\"' <<< "$xprop_root" ) ]];then
+			DE="XFCE5"
+		fi
+}
+# DE detection - end
+
+# WM detection - begin
+detectwm () {
+	WM="Not Found"
+	userID="$(id -u ${USER})"
+	for each in $wmnames; do
+		PID="$(pgrep -U ${userID} $each)"
+			if [ "$PID" ]; then
+				case $each in
+					'fluxbox') WM="FluxBox";;
+					'openbox') WM="OpenBox";;
+					'blackbox') WM="Blackbox";;
+					'xfwm4') WM="Xfwm4";;
+					'mutter') WM="Mutter";;
+					'metacity') WM="Metacity";;
+					'kwin') WM="KWin";;
+					'icewm') WM="IceWM";;
+					'pekwm') WM="PekWM";;
+					'fvwm') WM="FVWM";;
+					'dwm') WM="DWM";;
+					'awesome') WM="Awesome";;
+					'wmaker') WM="WindowMaker";;
+					'stumpwm') WM="StumpWM";;
+					'xmonad') WM="XMonad";;
+					'musca') WM="Musca";;
+					'i3') WM="i3";;
+					'ratpoison') WM="Ratpoison";;
+					'scrotwm') WM="ScrotWM";;
+					'spectrwm') WM="SpectrWM";;
+					'wmfs') WM="WMFS";;
+					'wmii') WM="wmii";;
+					'subtle') WM="subtle";;
+					'e16') WM="E16";;
+					'enlightenment') WM="E17";;
+					'emerald') WM="Emerald";;
+					'sawfish') WM="Sawfish";;
+					'beryl') WM="Beryl";;
+					'monsterwm') WM="monsterwm";;
+					'dminiwm') WM="dminiwm";;
+					'compiz') WM="Compiz";;
+					'Finder') WM="Quartz Compositor";;
+					'herbstluftwm') WM="herbstluftwm";;
+					'cinnamon') WM="Cinnamon";;
+				esac
+			fi
+	done
+}
+# WM detection - end
+
+# GTK theme detection - begin
+detecttheme () {
+	theme="Not Found"
+	case $DE in
+		*) # Lightweight or No DE Found
+			if which gsettings >/dev/null 2>&1; then # First try see if GTK3 is being used
+				#if [ $? -eq 0 ]; then theme=$(gsettings get org.gnome.desktop.interface gtk-theme | tr -d "'");
+				if [ -f $HOME/.config/gtk-3.0/settings.ini ]; then
+						if grep -q gtk-theme-name $HOME/.config/gtk-3.0/settings.ini; then
+							theme=$(awk -F'=' '/gtk-theme-name/ {print $2}' $HOME/.config/gtk-3.0/settings.ini)
+						fi
+				fi
+			else [ -f $HOME/.gtkrc-2.0 ];
+				if grep -q gtk-theme $HOME/.gtkrc-2.0; then 
+					theme=$(awk -F'"' '/gtk-theme/ {print $2}' $HOME/.gtkrc-2.0)
+				fi
+			fi
+			# $HOME/.gtkrc.mine theme detect only
+			if [ -f $HOME/.gtkrc.mine ]; then
+				if grep -q "^include" $HOME/.gtkrc.mine; then
+					theme=$(grep '^include.*gtkrc' $HOME/.gtkrc.mine | awk -F "/" '{ print $5 }')
+				fi
+			fi
+		;;
+		'KDE')	# Desktop Environment found as "KDE"
+			if [ -a $HOME/.kde/share/config/kdeglobals ]; then
+				if grep -q "widgetStyle=" $HOME/.kde/share/config/kdeglobals; then
+					theme=$(awk -F"=" '/widgetStyle=/ {print $2}' $HOME/.kde/share/config/kdeglobals)
+				elif grep -q "colorScheme=" $HOME/.kde/share/config/kdeglobals; then
+					theme=$(awk -F"=" '/colorScheme=/ {print $2}' $HOME/.kde/share/config/kdeglobals)
+				fi
+			fi
+		;;
+		'Cinnamon')
+			if which gsettings >/dev/null 2>&1; then
+				theme=$(gsettings get org.gnome.desktop.interface gtk-theme | tr -d "'")
+			fi
+		;;
+		'GNOME'|'MATE') # Desktop Environment found as "GNOME"
+			 # (Gnome 3.0+)
+			if which gsettings >/dev/null 2>&1; then
+				theme=$(gsettings get org.gnome.desktop.interface gtk-theme | tr -d "'")
+			elif which gconftool-2 >/dev/null 2>&1; then
+				theme=$(gconftool-2 -g /desktop/gnome/interface/gtk_theme)
+			fi
+		;;
+		'XFCE')	# Desktop Environment found as "XFCE"
+			if which xfconf-query >/dev/null 2>&1; then
+				theme=$(xfconf-query -c xsettings -p /Net/ThemeName)
+			fi
+		;;
+		'LXDE')
+			if [ -f ${XDG_CONFIG_HOME:-${HOME}/.config}/lxde/config ]; then
+				lxdeconf="/lxde/config"
+			else
+				lxdeconf="/lxsession/LXDE/desktop.conf"
+			fi
+			# TODO: Clean me.
+			if grep -q "sNet\/ThemeName" ${XDG_CONFIG_HOME:-${HOME}/.config}$lxdeconf; then 
+			 theme=$(awk -F'=' '/sNet\/ThemeName/ {print $2}' ${XDG_CONFIG_HOME:-${HOME}/.config}$lxdeconf)
+			fi
+		;;
+	esac
+}
+# GTK theme detection - end
+
+# Font detection - begin
+detectfont () {
+	font="Not Found"
+	case $DE in
+		*) # Lightweight or No DE Found
+			if which gsettings &>/dev/null 2>&1; then # First try see if GTK3 is being used
+				font=$(gsettings get org.gnome.desktop.interface font-name | tr -d "'");
+			elif [ -f $HOME/.config/gtk-3.0/settings.ini ]; then
+				if grep -q gtk-font-name $HOME/.config/gtk-3.0/settings.ini; then
+					font=$(awk -F'=' '/gtk-font-name/ {print $2}' $HOME/.config/gtk-3.0/settings.ini)
+				fi
+			else [ -f $HOME/.gtkrc-2.0 ];
+				if grep -q font $HOME/.gtkrc-2.0; then
+					gtkfont=$(awk -F'"' '/gtk-font-name/ {print $2}' $HOME/.gtkrc-2.0)
+				fi
+			fi
+		;;
+		'KDE')	# Desktop Environment found as "KDE"
+			if [ -a $HOME/.kde/share/config/kdeglobals ]; then
+				if grep -q "Font=" $HOME/.kde/share/config/kdeglobals; then
+					font=$(awk -F"=" '/font=/ {print $2}' $HOME/.kde/share/config/kdeglobals)
+				fi
+			fi
+		;;
+		'GNOME'|'MATE') # Desktop Environment found as "GNOME"
+			 # (Gnome 3.0+)
+			if which gsettings >/dev/null 2>&1; then
+				font=$(gsettings get org.gnome.desktop.interface font-name | tr -d "'")
+			elif which gconftool-2 >/dev/null 2>&1; then
+				font=$(gconftool-2 -g /desktop/gnome/interface/font_name)
+			fi
+		;;
+		'XFCE')	# Desktop Environment found as "XFCE"
+			if which xfconf-query >/dev/null 2>&1; then
+				font=$(xfconf-query -c xsettings -p /Gtk/FontName)
+			fi
+		;;
+		'LXDE')
+			if [ -f ${XDG_CONFIG_HOME:-${HOME}/.config}/lxde/config ]; then
+				lxdeconf="/lxde/config"
+			else
+				lxdeconf="/lxsession/LXDE/desktop.conf"
+			fi
+			# TODO: Clean me.
+			if grep -q FontName ${XDG_CONFIG_HOME:-${HOME}/.config}$lxdeconf; then
+				font=$(awk -F'=' '/sGtk\/FontName/ {print $2}' ${XDG_CONFIG_HOME:-${HOME}/.config}$lxdeconf)
+			fi	 
+		;;
+	esac
+}
+# Font detection - end
+
+##################
+# Let's Do This! #
+##################
+asciiText () {
+	startline="0"
+	fulloutput=(
+"${c1}                      _     _ _                   "
+"${c1}        __ _ _ __ ___| |__ | (_)_ __  _   ___  __ "
+"${c1}       / _\` | '__/ __| '_ \| | | '_ \| | | \ \/ / "
+"${c1}      | (_| | | | (__| | | | | | | | | |_| |>  <  "
+"${c1}       \__,_|_|  \___|_| |_|_|_|_| |_|\__,_/_/\_\ "
+"                                                       "
+"${c2}       A simple, lightweight Linux distribution.   ")
+
+n=${#fulloutput[*]}
+	for ((i=0;i<n;i++)); do
+		printf "${fulloutput[i]}$c0\n"
+	done
+}
+
+infoDisplay () {
+	if [[ "${display[@]}" =~ "user" ]]; then myuser=$(echo -e "$labelcolor     User: $textcolor  ${user}"); fi
+	if [[ "${display[@]}" =~ "host" ]]; then myhost=$(echo -e "$labelcolor     Host: $textcolor  ${host}"); fi
+	if [[ "${display[@]}" =~ "kernel" ]]; then mykernel=$(echo -e "$labelcolor     Kernel:$textcolor $kernel"); fi
+	if [[ "${display[@]}" =~ "uptime" ]]; then myuptime=$(echo -e "$labelcolor     Uptime:$textcolor $uptime"); fi
+	if [[ "${display[@]}" =~ "pkgs" ]]; then mypkgs=$(echo -e "$labelcolor     Packages:$textcolor $pkgs"); fi
+	if [[ "${display[@]}" =~ "shell" ]]; then myshell=$(echo -e "$labelcolor     Shell:$textcolor  $shell"); fi
+	if [ "$DE" != "Not Present" ]; then
+		if [[ "${display[@]}" =~ "de" ]]; then myde=$(echo -e "$labelcolor     DE:$textcolor     $DE"); fi
+	fi
+	if [[ "${display[@]}" =~ "wm" ]]; then mywm=$(echo -e "$labelcolor     WM:$textcolor     $WM"); fi
+	if [[ "${display[@]}" =~ "theme" ]]; then mytheme=$(echo -e "$labelcolor     Theme:$textcolor  $theme"); fi
+	if [[ "${display[@]}" =~ "font" ]]; then myfont=$(echo -e "$labelcolor     Font:$textcolor   $font"); fi
+
+	if [[ "$display_type" == "ASCII" ]]; then
+		asciiText
+	fi
+	echo -e "$myuser"
+	echo -e "$myhost"
+	echo -e "$mykernel"
+	echo -e "$myuptime"
+	echo -e "$myshell"
+	echo -e "$myde"
+	echo -e "$mywm"
+	echo -e "$mytheme"
+	echo -e "$myfont"
+	echo -e ""
+}
+
+for i in "${display[@]}"; do
+	[[ "${display[*]}" =~ "$i" ]] && detect${i}
+done
+
+infoDisplay
+exit 0
