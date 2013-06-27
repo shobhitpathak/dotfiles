@@ -30,9 +30,9 @@ URxvt.cursorBlink:      true
 URxvt.depth:            32
 
 ! URxvt: Perl
-URxvt.perl-lib:		/usr/lib/urxvt/perl/
-URxvt.perl-ext-common: 	default,matcher,searchable-scrollback,vtwheel
-URxvt.url-launcher: 	/usr/bin/chromium
+URxvt.perl-lib:		      /usr/lib/urxvt/perl/
+URxvt.perl-ext-common: 	default,matcher,searchable-scrollback,clipboard
+URxvt.url-launcher: 	  /usr/bin/chromium
 URxvt.cutchars:         '"'()*<>[]{|}
 URxvt*match.pattern.1:  \\bwww\\.[\\w-]+\\.[\\w./?&@URxvt-]*[\\w/-]
 URxvt.matcher.button:   1
@@ -41,6 +41,8 @@ URxvt.colorUL: #667899
 ! URxvt: Keybindings
 URxvt*keysym.Home:      \033[1~
 URxvt*keysym.End:       \033[4~
+URxvt.keysym.M-c:       perl:clipboard:copy
+URxvt.keysim.M-v:       perl:clipboard:paste
 
 ! Appearance
 
