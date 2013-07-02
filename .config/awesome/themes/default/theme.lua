@@ -33,6 +33,8 @@ theme.bg_em              = "#151515"
 theme.fg_em              = "#e8e8d3"
 
 theme.wallpaper          = "~/wall.jpg"
+theme.wall1 = "~/img/wall3.jpg"
+theme.wall2 = "~/img/wall2.jpg"
 
 -- Taglist
 theme.taglist_squares_sel   = theme.confdir .. "/taglist/squarefw.png"

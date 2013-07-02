@@ -74,11 +74,14 @@ themedir = confdir .. "/themes/"
 beautiful.init(themedir .. theme .. "/theme.lua")
 
 -- Set wallpaper
-if beautiful.wallpaper then
-    for s = 1, screen.count() do
-        gears.wallpaper.maximized(beautiful.wallpaper, s, true)
-    end
-end
+--if beautiful.wallpaper then
+--    for s = 1, screen.count() do
+--        gears.wallpaper.maximized(beautiful.wallpaper, s, true)
+--    end
+--end
+
+gears.wallpaper.maximized(beautiful.wall1, 1, true);
+gears.wallpaper.maximized(beautiful.wall2, 2, true);
 
 -- Set tags
 tags = {
